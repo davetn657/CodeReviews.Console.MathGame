@@ -8,6 +8,10 @@ const string RandomOperator = "RANDOM";
 const int EasyMultiplier = 1;
 const int MediumMultiplier = 2;
 const int HardMultiplier = 3;
+const int MinimumOperands = 1;
+const int MaximumOperands = 2;
+const int MinimumValue = -100;
+const int MaximumValue = 100;
 
 const string ReturnPreviousScreen = "RETURN";
 const string AdditionOperator = "+";
@@ -68,35 +72,38 @@ void ChooseDifficultyScreen()
     Console.WriteLine("3: " + HardDifficulty);
 
     Console.Write("Enter here:");
-    int difficulty = 1;
+    string difficulty = string.Empty;
+    int modifer = 0;
     string playerDifficultyInput = Console.ReadLine() ?? string.Empty;
     Console.Clear();
 
     switch (playerDifficultyInput.ToUpper())
     {
         case "1":
-            difficulty = EasyMultiplier;
-            ChooseOperatorsScreen(difficulty);
+            difficulty = EasyDifficulty;
+            modifer = EasyMultiplier;
             break;
         case "2":
-            difficulty = MediumMultiplier;
-            ChooseOperatorsScreen(difficulty);
+            difficulty = MediumDifficulty;
+            modifer = MediumMultiplier;
             break;
         case "3":
-            difficulty = HardMultiplier;
-            ChooseOperatorsScreen(difficulty);
+            difficulty = HardDifficulty;
+            modifer = HardMultiplier;
             break;
         case ReturnPreviousScreen:
             StartApplicationScreen();
-            break;
+            return;
         default:
             Console.WriteLine("CHOOSE A VALID INPUT (1-3)!\n");
             ChooseDifficultyScreen();
-            break;
+            return;
     }
+
+    ChooseOperatorsScreen(difficulty, modifer);
 }
 
-void ChooseOperatorsScreen(int difficulty)
+void ChooseOperatorsScreen(string difficulty, int modifer)
 {
     Console.WriteLine($"Enter \"{ReturnPreviousScreen}\" to return to menu");
     Console.WriteLine("Choose your operator!\n");
@@ -108,39 +115,41 @@ void ChooseOperatorsScreen(int difficulty)
     Console.WriteLine("5: " + RandomOperator);
 
     string playerOperatorInput = Console.ReadLine() ?? string.Empty;
+    string currentOperator = string.Empty;
     gameTimer.Start();
     Console.Clear();
 
     switch (playerOperatorInput.ToUpper())
     {
         case "1":
-            PlayGameScreen(difficulty, AdditionOperator);
+            currentOperator = AdditionOperator;
             break;
         case "2":
-            PlayGameScreen(difficulty, SubtractOperator);
+            currentOperator = SubtractOperator;
             break;
         case "3":
-            PlayGameScreen(difficulty, MultiplicationOperator);
+            currentOperator = MultiplicationOperator;
             break;
         case "4":
-            PlayGameScreen(difficulty, DivisionOperator);
+            currentOperator = DivisionOperator;
             break;
         case "5":
-            PlayGameScreen(difficulty, RandomOperator);
+            currentOperator = RandomOperator;
             break;
         case ReturnPreviousScreen:
             StartApplicationScreen();
-            break;
+            return;
         default:
             Console.WriteLine("Enter a valid input (1-5)");
-            ChooseOperatorsScreen(difficulty);
-            break;
+            ChooseOperatorsScreen(difficulty, modifer);
+            return;
     }
 
 
+    PlayGameScreen(difficulty, modifer, currentOperator);
 }
 
-void PlayGameScreen(int difficulty, string choosenOperator)
+void PlayGameScreen(string difficulty, int modifier, string choosenOperator)
 {
     string question = string.Empty;
     int playerAnswer = 0;
@@ -151,7 +160,7 @@ void PlayGameScreen(int difficulty, string choosenOperator)
         Console.WriteLine("Score: " + PlayerPoints);
         Console.WriteLine("Lives: " + new string('X', PlayerLives));
 
-        question = GenerateQuestion(difficulty, choosenOperator);
+        question = GenerateQuestion(difficulty, modifier, choosenOperator);
         Console.WriteLine("What is: " + question + " = ?");
 
         Console.WriteLine($"\nEnter \"{ReturnPreviousScreen}\" to end your run!");
@@ -178,7 +187,7 @@ void PlayGameScreen(int difficulty, string choosenOperator)
         {
             //scale points with difficulty
             //difficulty is the score multiplies for EASY,MEDIUM,HARD difficulties
-            PlayerPoints += 100 * difficulty;
+            PlayerPoints += 100 * modifier;
         }
         else
         {
@@ -197,34 +206,61 @@ void PlayGameScreen(int difficulty, string choosenOperator)
 }
 
 //CREATING EQUATION
-string GenerateQuestion(int difficulty, string optionalOperator = RandomOperator)
+string GenerateQuestion(string difficulty, int modifier, string optionalOperator = RandomOperator)
 {
-    int numberOfOperands = difficulty;
+    int numberOfOperands = difficulty == EasyDifficulty? MinimumOperands:MaximumOperands;
+    int minValue = -100 * modifier;
+    int maxValue = 100 * modifier;
     string question = string.Empty;
+    string currentOperator = string.Empty;
+    int currentValue = 0;
+    List<int> cleanDivisors = new List<int>();
 
     Random random = new Random();
-    question += random.Next(-100, 100).ToString();
+    question += random.Next(minValue, maxValue).ToString();
 
-    if (optionalOperator == RandomOperator)
+    for(int i = 0; i < numberOfOperands; i++)
     {
-        for (int i = 0; i < numberOfOperands; i++)
+        if(optionalOperator == RandomOperator)
         {
-            //pick a random operand
-            question += " " + GenerateOperator(random.Next(4));
-            question += " " + random.Next(-100, 100).ToString();
+            currentOperator = GenerateOperator(random.Next(1,5));
         }
-    }
-    else
-    {
-        for (int i = 0; i < numberOfOperands; i++)
+        else
         {
-            question += " " + optionalOperator;
-            question += " " + random.Next(-100, 100).ToString();
+            currentOperator = optionalOperator;
         }
+
+        if(currentOperator == DivisionOperator)
+        {
+            //ensure no division by zero & is a clean division
+            int currentAnswer = CheckAnswer(question);
+
+            for (int j = 1; j < Math.Abs(currentAnswer); j++)
+            {
+                if (currentAnswer % j == 0)
+                {
+                    cleanDivisors.Add(j);
+                    cleanDivisors.Add(-j);
+                }
+            }
+
+            currentValue = cleanDivisors[random.Next(0, cleanDivisors.Count - 1)];
+            cleanDivisors.Clear();
+        }
+        else
+        {
+            currentValue = random.Next(minValue, maxValue);
+        }
+
+        question += " " + currentOperator;
+        question += " " + currentValue;
+
     }
 
     return question;
 }
+
+
 
 //SOLVING EQUATION
 int CheckAnswer(string question)
@@ -235,6 +271,11 @@ int CheckAnswer(string question)
     int questionSize = solveQuestion.Length;
     int operatorIndex = 0;
     int total = 0;
+
+    if(questionSize <= 1 && Int32.TryParse(solveQuestion[0], out total))
+    {
+        return total;
+    }
 
     while (questionSize > 1)
     {
@@ -382,9 +423,9 @@ void HowToPlayScreen()
     Console.WriteLine("HOW TO PLAY:");
     Console.WriteLine("STEP 1: In main menu type \'1\' (Play)");
     Console.WriteLine($"STEP 2: Choose your difficulty ({EasyDifficulty}, {MediumDifficulty}, {HardDifficulty})");
-    Console.WriteLine($"\tEasy - {EasyMultiplier} Operator Equations");
-    Console.WriteLine($"\tMedium - {MediumMultiplier} Operator Equations");
-    Console.WriteLine($"\tHard - {HardMultiplier} Operator Equations");
+    Console.WriteLine($"\tEasy - {MinimumOperands} Operator Equations & values between {MinimumValue * EasyMultiplier} to {MaximumValue * EasyMultiplier}");
+    Console.WriteLine($"\tMedium - {MaximumOperands} Operator Equations & values between {MinimumValue * MediumMultiplier} to {MaximumValue * MediumMultiplier}");
+    Console.WriteLine($"\tHard - {MaximumOperands} Operator Equations & values between {MinimumValue * HardMultiplier} to {MaximumValue * HardMultiplier}");
     Console.WriteLine("STEP 3: Choose random or specific operators");
     Console.WriteLine("STEP 4: Solve math problems, get points! (You get three lives)");
 
